@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -22,14 +22,21 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    // dto.role is constrained to 'SEEKER' | 'SOLVER' by SignupDto's @IsIn
+    // check — this cast is safe specifically because that validation ran.
+    // Never widen SignupDto.role back to the full Role enum.
+    const role = dto.role as Role;
 
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash,
-        role: dto.role,
-        isEmailVerified: true, // Auto-verify for MVP
-        ...(dto.role === Role.SEEKER
+        role,
+        // NOTE: auto-verifying email here is a deliberate MVP shortcut, not
+        // a security best practice — a real email-verification flow (send
+        // a token, confirm via link) should replace this before launch.
+        isEmailVerified: true,
+        ...(role === Role.SEEKER
           ? {
               seekerProfile: {
                 create: { name: dto.name, organization: dto.organization },
@@ -50,6 +57,8 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) {
+      // Deliberately identical error/timing-shape to the wrong-password
+      // case below — never reveal whether the email exists.
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -69,7 +78,24 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!storedToken || storedToken.isRevoked || storedToken.expiresAt < new Date()) {
+    if (!storedToken) {
+      throw new UnauthorizedException('Refresh token is invalid or expired');
+    }
+
+    if (storedToken.isRevoked) {
+      // SECURITY: a revoked token being presented again means either the
+      // legitimate rotation flow raced itself, or a stolen refresh token
+      // is being replayed after the real user already rotated past it.
+      // We can't tell those apart, so treat it as a compromise signal:
+      // kill every refresh token this user holds and force full re-login.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: storedToken.userId, isRevoked: false },
+        data: { isRevoked: true },
+      });
+      throw new UnauthorizedException('Refresh token is invalid or expired');
+    }
+
+    if (storedToken.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token is invalid or expired');
     }
 

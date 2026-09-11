@@ -1,83 +1,113 @@
 # Build Notes — read this before doing anything else
 
-This repository was assembled from code you supplied plus the minimum
-scaffolding needed for it to install and boot. It is **an early skeleton,
-not a working product**, and it is not ready for real users. Please don't
-mistake the presence of a security-controls table or a CI file for an
-actual security review — none has happened.
+This repository was assembled incrementally, then had a round of security
+fixes applied after a review. It is still a **partial backend, not a
+finished product**. Don't mistake a security-controls table for an
+external audit — none has happened.
 
 ## What's real and working
 
 - Monorepo structure (pnpm workspaces: `apps/`, `services/`, `packages/`)
-- Prisma schema (`services/api/prisma/schema.prisma`) — a complete, well
-  thought out data model for Users, Problems, Listings, Requests,
-  Proposals, Reviews, Subscriptions, Messaging, Notifications, and Admin
-  audit logs
-- `MatchingService` — a real (if simple) weighted scoring algorithm
-- `RolesGuard` and `SecurityHeadersMiddleware` — real, usable code
-- `AppModule` / `main.ts` — real NestJS bootstrap with global validation,
-  CORS, and rate limiting wired up
-- Two real frontend screens (`/listings`, `/problems/new`) with working
-  UI and local component state — **but they call no real API**; the data
-  is hardcoded/mocked in the component
-- Docker Compose for local Postgres (with pgvector) + Redis
-- Terraform for a basic AWS VPC, RDS, ElastiCache, and S3 bucket
-- GitHub Actions CI skeleton (install, audit, lint, test)
+- Prisma schema — a complete data model for Users, Problems, Listings,
+  Requests, Proposals, Reviews, Subscriptions, Messaging, Notifications,
+  and Admin audit logs
+- **`AuthModule`** — signup (restricted to SEEKER/SOLVER — see fixes
+  below), login, refresh-token rotation with reuse detection, bcrypt
+  password hashing, JWT access tokens, per-route rate limiting
+- **`ProblemsModule`** — `POST /problems` (validated via
+  `CreateProblemDto`, bound to the authenticated seeker) and
+  `GET /problems/:id` (enforces `PRIVATE` as owner/admin-only, masks
+  identity on `ANONYMOUS`)
+- **`MatchingModule`** — weighted scoring algorithm, now filtered at the
+  database level by category before scoring, wired to
+  `GET /matching/:problemId`
+- **`AllExceptionsFilter`** — global error handling, hides internal detail
+  in production
+- **`RolesGuard`**, **`OptionalJwtAuthGuard`**, **`SecurityHeadersMiddleware`**
+- `AppModule` / `main.ts` — fails fast at boot if required secrets are
+  missing; configures trust-proxy for correct rate limiting behind a load
+  balancer
+- `prisma/seed.ts` — seeds dev accounts; refuses to run when
+  `NODE_ENV=production`
+- `packages/ui` — shared `Card`/`Badge` components
+- Two frontend screens (`/listings`, `/problems/new`) — still using
+  mocked/hardcoded data client-side, **not yet calling the real API**
+- Docker Compose (Postgres+pgvector, Redis), Terraform (VPC/RDS/
+  ElastiCache/S3), GitHub Actions CI
 
-## What's stubbed — do not treat these as done
+## Security fixes applied in this round (previously flagged, now fixed)
 
-- **`AuthModule`, `UsersModule`, `ProblemsModule`, `ListingsModule`,
-  `RequestsLeadsModule`, `ProposalsModule`, `ReviewsModule`,
-  `BillingModule`, `AdminModule`** — all empty `@Module({})` stubs I added
-  so `AppModule` would compile. **None of these have controllers,
-  services, or DTOs yet.** No signup, no login, no problem submission
-  endpoint, no listing CRUD, nothing — despite the frontend screens
-  suggesting otherwise.
-- **`MatchingModule`** — wires up the real `MatchingService`, but there is
-  still no `MatchingController`, so `GET /api/v1/matching/:problemId`
-  (used by the e2e test) does not exist yet.
-- **Password hashing, JWT issuance/verification, refresh token rotation,
-  MFA** — none implemented. `docs/SECURITY.md` marks these "Planned," not
-  "Implemented" — the version you were shown earlier overstated this.
-- **Object-level authorization (IDOR checks)** — cannot exist yet because
-  the endpoints they'd protect don't exist.
-- **Anonymous-visibility identity hiding** — same: not implemented, no
-  Problems controller yet.
-- **Payments/Stripe integration** — not implemented; only placeholder env
-  vars exist.
-- **`packages/ui`** — empty. `Card.tsx`/`Badge.tsx` currently live only in
-  `apps/web/components/ui`, not in the shared package, so nothing outside
-  `apps/web` can use them yet.
-- **Terraform `db_password`** — the version you sent had a real-looking
-  password hardcoded in `main.tf`. I changed it to a required `sensitive`
-  Terraform variable (`TF_VAR_db_password` or a secrets backend) instead,
-  since committing that value would defeat the point of Terraform state
-  security. You must supply this value out-of-band before `terraform
-  apply` will run.
-- **No database migrations** — the Prisma schema exists, but nobody has
-  run `prisma migrate dev` to generate the actual SQL migration files, so
-  `services/api/prisma/migrations/` doesn't exist yet.
-- **No lockfile** — `pnpm install` has not been run in this environment,
-  so there's no `pnpm-lock.yaml` yet; the first `pnpm install` you run
-  will generate one — commit it.
-- **`Dockerfile.api`** — written but never built/tested here (no network
-  access in this environment); expect to debug it on first build.
+1. **Privilege escalation via signup** — `SignupDto.role` no longer
+   accepts the full `Role` enum; public signup is restricted to
+   `SEEKER`/`SOLVER` only. Admin accounts must be created out-of-band.
+2. **Hardcoded JWT fallback secret removed** — `JwtStrategy` and
+   `AuthModule` now throw at startup if `JWT_SECRET` is unset, instead of
+   silently signing tokens with a secret visible in the source.
+3. **`PRIVATE` problem visibility now enforced** — previously any problem
+   was readable by anyone with its id regardless of visibility.
+4. **`POST /problems` now validates input** — replaced `body: any` with
+   `CreateProblemDto` (length limits, enum checks, array-size limits).
+5. **Refresh-token reuse detection** — presenting an already-revoked
+   refresh token now revokes all of that user's tokens (possible-theft
+   response) instead of just returning a generic error.
+6. **CI lint gate actually gates now** — removed `|| true`, which had
+   made lint failures invisible to the pipeline.
+7. **Stricter throttling on auth endpoints** — signup/login/refresh have
+   their own per-route limits (5–10/min) on top of the global 100/min.
+8. **Length limits added to auth DTOs** to prevent oversized-input abuse.
+9. **Tightened security headers** — `default-src 'none'` CSP (this is a
+   JSON API, no HTML to allow), added `Referrer-Policy` and
+   `Permissions-Policy`.
+10. **Global exception filter** — internal error detail (stack traces,
+    Prisma messages) no longer reaches the client in production.
+11. **`trust proxy` configured** — rate limiting now sees real client IPs
+    behind a load balancer instead of treating everyone as one IP.
+12. **Matching query scoped to reduce load** — pre-filters candidates by
+    category at the database level and caps the candidate set at 500,
+    instead of loading every verified listing on the platform into memory
+    per request. Still not the final scale answer — see the `TODO` in
+    `matching.service.ts`.
+13. **Seed script refuses to run in production** — it creates
+    known-password accounts (including admin) and should never touch a
+    real database.
+
+## Known remaining gaps — not yet fixed
+
+- **Per-account brute-force protection.** Auth throttling is per-IP only;
+  an attacker spreading login attempts across many IPs against one
+  account isn't slowed down. Consider account-level lockout as a
+  follow-up.
+- **`isEmailVerified: true` is set unconditionally at signup.** No real
+  verification-email flow exists. Don't treat that field as meaningful.
+- **Matched-solver exception for `PRIVATE` problems** doesn't exist yet —
+  will need `RequestsLeadsModule` first.
+- **`UsersModule`, `ListingsModule`, `RequestsLeadsModule`,
+  `ProposalsModule`, `ReviewsModule`, `BillingModule`, `AdminModule`** —
+  still empty `@Module({})` shells. No listing CRUD, contact/request
+  flow, proposals, reviews, payments, or admin moderation.
+- **CI will likely fail on first push** now that the lint gate isn't
+  silenced — none of the workspace packages have an actual ESLint config
+  or the `eslint` package installed yet. Add real lint config before
+  relying on this gate, or `pnpm add -D eslint` plus a shared config in
+  `packages/config` and point each package's `lint` script at it.
+- **No database migrations, no lockfile yet** — run
+  `pnpm install` and `npx prisma migrate dev --name init` locally and
+  commit the results.
+- **`Dockerfile.api`** — written but never built/tested in this sandbox
+  (no network access here); expect to debug it on first real build.
+- **Duplicate UI components** — `Card`/`Badge` exist in both
+  `packages/ui/src/index.tsx` and `apps/web/components/ui/`. Consolidate.
 
 ## Suggested next steps, in order
 
-1. `pnpm install` locally and confirm it resolves cleanly.
-2. Implement `AuthModule` first (signup, login, refresh, email
-   verification) — almost everything else depends on having real users
-   and real JWTs to test against.
-3. Implement `ProblemsModule` and `ListingsModule` CRUD, with ownership
-   checks from day one (don't bolt them on later).
-4. Add a `MatchingController` that calls the existing `MatchingService`.
-5. Run `prisma migrate dev --name init` and commit the generated
-   migration.
-6. Only then start treating `docs/SECURITY.md` as a checklist to tick
-   off — with real tests proving each control, not just code that looks
-   like it does the right thing.
+1. `pnpm install` locally, confirm it resolves, commit the lockfile.
+2. Set up real ESLint config before your next CI run, or the pipeline
+   will fail immediately on the (now-enforced) lint step.
+3. `cd services/api && npx prisma migrate dev --name init && npx prisma db seed`
+4. Point the two existing frontend pages at the real API instead of
+   hardcoded mock data.
+5. Implement `ListingsModule` and `RequestsLeadsModule` next.
+6. Add account-level login lockout once real users exist to protect.
 
 If you hand this repository to an AI coding agent, point it at
-`MASTER_AI_BUILD_PROMPT.md` and this file together, so it builds the
-missing pieces instead of assuming they already exist.
+`MASTER_AI_BUILD_PROMPT.md` and this file together.

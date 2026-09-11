@@ -26,10 +26,20 @@ export class MatchingService {
       throw new Error('Problem statement not found');
     }
 
-    // High performance read path: Retrieve candidate solution listings in target category
+    // SCALE: the previous version loaded every VERIFIED listing on the
+    // entire platform into memory on every single match request — fine at
+    // dozens of listings, a real bottleneck at thousands, and a serious
+    // problem at the "millions of users" scale this project targets.
+    // Pre-filtering by category at the database level (indexed via
+    // @@index([category, solutionType]) in schema.prisma) cuts the
+    // candidate set dramatically before it ever reaches app memory.
+    //
+    // This is still not the final answer — see the TODO below — but it's
+    // a meaningful improvement over loading the whole table.
     const candidates = await this.prisma.listing.findMany({
       where: {
         verificationStatus: VerificationStatus.VERIFIED,
+        category: problem.category,
       },
       include: {
         solver: {
@@ -38,10 +48,18 @@ export class MatchingService {
           },
         },
       },
+      // Hard cap on candidates considered per request, independent of the
+      // final `limit` returned — prevents a category with tens of
+      // thousands of listings from still loading unbounded rows.
+      take: 500,
     });
 
     const scoredMatches: MatchScoreResult[] = candidates.map((listing) => {
       // 1. Category & Domain Match (30 Weight)
+      // Already filtered to matching category above, so this is always 30
+      // for anything that reached this point — kept explicit so the
+      // scoring breakdown stays meaningful if the query filter is ever
+      // loosened (e.g. to include adjacent categories) in the future.
       let categoryMatchScore = 0;
       if (listing.category.toLowerCase() === problem.category.toLowerCase()) {
         categoryMatchScore = 30;
@@ -90,5 +108,12 @@ export class MatchingService {
 
     // Sort descending by calculated score
     return scoredMatches.sort((a, b) => b.totalScore - a.totalScore).slice(0, limit);
+    // TODO (scale): at real volume this whole approach — load candidates,
+    // score in application code, sort in memory — should move to either
+    // (a) a precomputed/cached score refreshed on listing changes, or
+    // (b) a proper search index (OpenSearch/pgvector) doing the ranking,
+    // per MASTER_AI_BUILD_PROMPT.md Section 3.1. This fix reduces the
+    // immediate blast radius; it does not make the endpoint cache-free-safe
+    // at "millions of users" scale on its own.
   }
 }

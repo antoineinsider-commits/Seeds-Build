@@ -26,7 +26,7 @@ jobs:
         run: pnpm audit --prod
 
       - name: Code Typecheck & Lint
-        run: pnpm run lint || true
+        run: pnpm run lint
 
   test:
     runs-on: ubuntu-latest

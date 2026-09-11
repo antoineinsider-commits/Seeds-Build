@@ -1,7 +1,13 @@
 import { Module } from '@nestjs/common';
+import { ProblemsController } from './problems.controller';
+import { PrismaService } from '../../common/prisma.service';
 
-// STUB MODULE — scaffolded so AppModule resolves and the app boots.
-// Controllers, services, and DTOs for Problems still need to be implemented
-// per MASTER_AI_BUILD_PROMPT.md Section 8 (API surface) and Section 7 (data model).
-@Module({})
+// PRIVATE visibility is now enforced (owner or admin only; see
+// ProblemsController.getProblem). ANONYMOUS masks identity as before.
+// Still missing: a matched-solver exception for PRIVATE once
+// Requests/Leads exist — see BUILD_NOTES.md.
+@Module({
+  controllers: [ProblemsController],
+  providers: [PrismaService],
+})
 export class ProblemsModule {}

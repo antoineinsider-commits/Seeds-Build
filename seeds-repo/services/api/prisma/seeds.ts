@@ -4,6 +4,16 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
+  // SECURITY: this seed creates known-password accounts (including an
+  // ADMIN account). Never let it run against a production database.
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      'Refusing to run prisma/seed.ts with NODE_ENV=production. ' +
+        'This script creates accounts with a known, shared password.',
+    );
+    process.exit(1);
+  }
+
   console.log('Seeding database...');
 
   // Clear existing records
