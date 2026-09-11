@@ -1,0 +1,17 @@
+{
+  "name": "seeds",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SEEDS — a problem-first marketplace connecting problems to solutions.",
+  "scripts": {
+    "dev:api": "pnpm --filter @seeds/api start:dev",
+    "dev:web": "pnpm --filter @seeds/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

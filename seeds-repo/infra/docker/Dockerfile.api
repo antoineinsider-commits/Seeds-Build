@@ -1,0 +1,29 @@
+# Multi-stage build for services/api — minimal runtime image, non-root user.
+
+FROM node:20-alpine AS builder
+WORKDIR /repo
+
+RUN corepack enable && corepack prepare pnpm@8 --activate
+
+COPY pnpm-workspace.yaml package.json ./
+COPY packages ./packages
+COPY services/api ./services/api
+
+RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm --filter @seeds/api exec prisma generate
+RUN pnpm --filter @seeds/api build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN addgroup -S seeds && adduser -S seeds -G seeds
+ENV NODE_ENV=production
+
+COPY --from=builder /repo/services/api/dist ./dist
+COPY --from=builder /repo/services/api/node_modules ./node_modules
+COPY --from=builder /repo/services/api/prisma ./prisma
+COPY --from=builder /repo/services/api/package.json ./package.json
+
+USER seeds
+EXPOSE 4000
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,307 @@
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+enum Role {
+  SEEKER
+  SOLVER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+  ANONYMOUS
+}
+
+enum ProblemStatus {
+  OPEN
+  IN_MATCHING
+  MATCHED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SolutionType {
+  EXISTING_SOFTWARE
+  EXPERT_CONSULTANT
+  KNOWLEDGE_PRODUCT
+  DONE_FOR_YOU_SERVICE
+  CUSTOM_BUILD
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
+model User {
+  id                   String             @id @default(uuid())
+  email                String             @unique
+  passwordHash         String
+  role                 Role               @default(SEEKER)
+  isEmailVerified      Boolean            @default(false)
+  verificationToken    String?
+  mfaEnabled           Boolean            @default(false)
+  mfaSecret            String?
+  refreshTokens        RefreshToken[]
+  seekerProfile        SeekerProfile?
+  solverProfile        SolverProfile?
+  reviewsWritten       Review[]           @relation("Reviewer")
+  reviewsReceived      Review[]           @relation("ReviewedParty")
+  sentMessages         Message[]
+  adminAuditLogs       AdminAuditLog[]
+  notifications        Notification[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model SeekerProfile {
+  id           String     @id @default(uuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  organization String?
+  industry     String?
+  location     String?
+  problems     Problem[]
+  requests     Request[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model SolverProfile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName        String
+  bio                String             @db.Text
+  skills             String[]
+  industries         String[]
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  verificationDocUrl String?            // Column-level encrypted or restricted bucket
+  rating             Float              @default(0.0)
+  reviewCount        Int                @default(0)
+  responseTimeHours  Int                @default(24)
+  listings           Listing[]
+  proposals          Proposal[]
+  requests           Request[]
+  subscription       Subscription?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([verificationStatus])
+}
+
+model Problem {
+  id                  String             @id @default(uuid())
+  seekerId            String
+  seeker              SeekerProfile      @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  title               String
+  description         String             @db.Text
+  industry            String
+  urgency             String             // High, Medium, Low
+  budgetMin           Float
+  budgetMax           Float
+  visibility          Visibility         @default(PUBLIC)
+  status              ProblemStatus      @default(OPEN)
+  category            String
+  tags                String[]
+  preferredSolution   SolutionType?
+  // Vector embedding for semantic match (1536 dim for OpenAI or pgvector compatibility)
+  embedding           Unsupported("vector(1536)")?
+  requests            Request[]
+  proposals           Proposal[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([category, industry])
+  @@index([status])
+  @@index([seekerId])
+}
+
+model Listing {
+  id                 String             @id @default(uuid())
+  solverId           String
+  solver             SolverProfile      @relation(fields: [solverId], references: [id], onDelete: Cascade)
+  title              String
+  solutionType       SolutionType
+  problemItSolves    String             @db.Text
+  targetCustomer     String
+  description        String             @db.Text
+  pricingModel       String             // Fixed, Subscription, Quote
+  priceMin           Float
+  priceMax           Float?
+  deliveryTimeDays   Int
+  category           String
+  tags               String[]
+  verificationStatus VerificationStatus @default(PENDING)
+  isFeatured         Boolean            @default(false)
+  rating             Float              @default(0.0)
+  reviewCount        Int                @default(0)
+  embedding          Unsupported("vector(1536)")?
+  requests           Request[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([category, solutionType])
+  @@index([verificationStatus, isFeatured])
+  @@index([solverId])
+}
+
+model Request {
+  id            String        @id @default(uuid())
+  problemId     String
+  problem       Problem       @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  listingId     String?
+  listing       Listing?      @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  seekerId      String
+  seeker        SeekerProfile @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  solverId      String
+  solver        SolverProfile @relation(fields: [solverId], references: [id], onDelete: Cascade)
+  message       String        @db.Text
+  status        RequestStatus @default(PENDING)
+  threads       Thread[]
+  reviews       Review[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([seekerId])
+  @@index([solverId])
+  @@index([problemId])
+}
+
+model Proposal {
+  id               String        @id @default(uuid())
+  problemId        String
+  problem          Problem       @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  solverId         String
+  solver           SolverProfile @relation(fields: [solverId], references: [id], onDelete: Cascade)
+  proposedApproach String        @db.Text
+  timelineDays     Int
+  price            Float
+  deliverables     String[]
+  status           RequestStatus @default(PENDING)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([problemId])
+  @@index([solverId])
+}
+
+model Review {
+  id                   String        @id @default(uuid())
+  reviewerId           String
+  reviewer             User          @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewedPartyId      String
+  reviewedParty        User          @relation("ReviewedParty", fields: [reviewedPartyId], references: [id], onDelete: Cascade)
+  requestId            String
+  request              Request       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  responsivenessRating Int
+  professionalismRating Int
+  qualityRating        Int
+  valueRating          Int
+  recommendRating      Int
+  overallScore         Float
+  comment              String        @db.Text
+  isVerified           Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+
+  @@index([reviewedPartyId])
+}
+
+model Subscription {
+  id                     String        @id @default(uuid())
+  solverId               String        @unique
+  solver                 SolverProfile @relation(fields: [solverId], references: [id], onDelete: Cascade)
+  plan                   PlanTier      @default(FREE)
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  status                 String
+  currentPeriodEnd       DateTime
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+}
+
+model Thread {
+  id        String    @id @default(uuid())
+  requestId String    @unique
+  request   Request   @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  threadId  String
+  thread    Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([threadId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action    String
+  targetId  String
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+}

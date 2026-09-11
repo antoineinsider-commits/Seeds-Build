@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env files — never commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Prisma
+services/api/prisma/migrations/dev.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/*.tfvars

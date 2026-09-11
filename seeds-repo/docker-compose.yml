@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: seeds_postgres
+    environment:
+      POSTGRES_USER: seeds_user
+      POSTGRES_PASSWORD: seeds_secure_password_2026
+      POSTGRES_DB: seeds_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seeds_user -d seeds_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: seeds_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: ./infra/docker/Dockerfile.api
+    container_name: seeds_api
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: "postgresql://seeds_user:seeds_secure_password_2026@postgres:5432/seeds_db?schema=public"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: "SUPER_SECRET_JWT_KEY_CHANGE_IN_PRODUCTION_MIN_64_CHARS_LONG_123456789"
+      JWT_REFRESH_SECRET: "SUPER_SECRET_REFRESH_KEY_CHANGE_IN_PRODUCTION_MIN_64_CHARS_LONG"
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
