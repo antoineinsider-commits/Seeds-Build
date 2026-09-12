@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { ListingsController } from './listings.controller';
+import { PrismaService } from '../../common/prisma.service';
 
-// STUB MODULE — scaffolded so AppModule resolves and the app boots.
-// Controllers, services, and DTOs for Listings still need to be implemented
-// per MASTER_AI_BUILD_PROMPT.md Section 8 (API surface) and Section 7 (data model).
-@Module({})
+@Module({
+  controllers: [ListingsController],
+  providers: [PrismaService],
+})
 export class ListingsModule {}
