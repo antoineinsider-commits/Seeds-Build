@@ -13,48 +13,43 @@ interface SolutionListing {
   priceMin: number;
   rating: number;
   isFeatured: boolean;
-  solverName: string;
+  solver: {
+    companyName: string;
+    rating: number;
+  };
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export default function BrowseListingsPage() {
   const [listings, setListings] = useState<SolutionListing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>('ALL');
 
   useEffect(() => {
-    // Simulated fetch from API backend
-    setTimeout(() => {
-      setListings([
-        {
-          id: '1',
-          title: 'Inventory Sync Automation for Local Restaurants',
-          solutionType: 'DONE_FOR_YOU_SERVICE',
-          description: 'Connect POS directly to supplier portals to auto-order stock before weekends.',
-          pricingModel: 'Fixed',
-          priceMin: 499,
-          rating: 4.9,
-          isFeatured: true,
-          solverName: 'Apex Automation Studio',
-        },
-        {
-          id: '2',
-          title: 'SaaS POS & Kitchen Execution System',
-          solutionType: 'EXISTING_SOFTWARE',
-          description: 'Cloud-native kitchen display software with real-time ticket routing.',
-          pricingModel: 'Subscription',
-          priceMin: 79,
-          rating: 4.7,
-          isFeatured: false,
-          solverName: 'KitchenPulse Systems',
-        },
-      ]);
-      setLoading(false);
-    }, 500);
+    async function fetchListings() {
+      try {
+        const res = await fetch(`${API_URL}/listings`);
+        if (!res.ok) {
+          throw new Error(`API returned ${res.status}`);
+        }
+        const data = await res.json();
+        setListings(data);
+      } catch (err) {
+        console.error('Failed to load listings:', err);
+        setError('Could not load listings. Is the API running?');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchListings();
   }, []);
 
-  const filtered = filterType === 'ALL' 
-    ? listings 
-    : listings.filter(l => l.solutionType === filterType);
+  const filtered = filterType === 'ALL'
+    ? listings
+    : listings.filter((l) => l.solutionType === filterType);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -71,7 +66,6 @@ export default function BrowseListingsPage() {
         </a>
       </div>
 
-      {/* Filter Tabs */}
       <div className="flex gap-2 mb-6 border-b border-slate-200 pb-3">
         {['ALL', 'EXISTING_SOFTWARE', 'DONE_FOR_YOU_SERVICE', 'EXPERT_CONSULTANT'].map((type) => (
           <button
@@ -86,12 +80,21 @@ export default function BrowseListingsPage() {
         ))}
       </div>
 
-      {/* Grid UI */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4 mb-6">
+          {error}
+        </div>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-48 bg-slate-100 animate-pulse rounded-xl" />
           ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-slate-500">
+          No listings found{filterType !== 'ALL' ? ' in this category' : ''}.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -110,8 +113,8 @@ export default function BrowseListingsPage() {
 
               <div className="border-t border-slate-100 pt-4 mt-2">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs text-slate-500">By {item.solverName}</span>
-                  <span className="text-xs font-medium text-amber-600">★ {item.rating}</span>
+                  <span className="text-xs text-slate-500">By {item.solver.companyName}</span>
+                  <span className="text-xs font-medium text-amber-600">★ {item.solver.rating}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div>
