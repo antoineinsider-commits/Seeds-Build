@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getAccessToken, isLoggedIn } from '../../lib/auth';
+import { getAccessToken, isLoggedIn } from '../../../lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
