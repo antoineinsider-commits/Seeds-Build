@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { RequestsLeadsController } from './requests-leads.controller';
+import { PrismaService } from '../../common/prisma.service';
 
-// STUB MODULE — scaffolded so AppModule resolves and the app boots.
-// Controllers, services, and DTOs for RequestsLeads still need to be implemented
-// per MASTER_AI_BUILD_PROMPT.md Section 8 (API surface) and Section 7 (data model).
-@Module({})
+@Module({
+  controllers: [RequestsLeadsController],
+  providers: [PrismaService],
+})
 export class RequestsLeadsModule {}
