@@ -43,6 +43,21 @@ export class ProblemsController {
     });
   }
 
+  // NEW: lets a logged-in seeker list their own problems — needed so the
+  // frontend can offer "which of my problems is this contact request
+  // about" without the seeker having to remember/paste a UUID.
+  @Get('mine')
+  @UseGuards(AuthGuard('jwt'))
+  async getMyProblems(@Req() req: any) {
+    if (!req.user.seekerProfileId) {
+      throw new ForbiddenException('Only registered Seekers have problems to list');
+    }
+    return this.prisma.problem.findMany({
+      where: { seekerId: req.user.seekerProfileId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   // OptionalJwtAuthGuard: this route is publicly reachable (PUBLIC and
   // ANONYMOUS problems must be readable by unauthenticated visitors), but
   // we still need to know who's asking to enforce PRIVATE visibility below.
@@ -65,13 +80,7 @@ export class ProblemsController {
       const isOwner = requester?.seekerProfileId === problem.seekerId;
       const isAdmin = requester?.role === Role.ADMIN || requester?.role === Role.SUPER_ADMIN;
 
-      // SECURITY: a real matched-solver exception belongs here once
-      // Requests/Leads exist (a solver the problem was actually sent to
-      // should also be able to view it). Until then, PRIVATE means
-      // owner-or-admin only.
       if (!isOwner && !isAdmin) {
-        // 404, not 403 — don't confirm to an unauthorized caller that a
-        // private problem with this id even exists.
         throw new NotFoundException('Problem not found');
       }
 
