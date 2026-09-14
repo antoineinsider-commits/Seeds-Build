@@ -9,10 +9,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Role, VerificationStatus } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { AdminService } from '../../../../../stage5_level51_patch/services/api/src/modules/admin/admin.service';
+import { AdminService } from './admin.service';
 import {
   AdminAuditQueryDto,
   SetListingVerificationDto,
@@ -20,7 +19,7 @@ import {
 
 @Controller('admin')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(Role.ADMIN, Role.SUPER_ADMIN)
+@Roles('ADMIN', 'SUPER_ADMIN')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -38,7 +37,7 @@ export class AdminController {
     return this.adminService.setListingVerification(
       req.user.id,
       id,
-      dto.status as VerificationStatus.VERIFIED | VerificationStatus.REJECTED,
+      dto.status,
     );
   }
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 
 export type AdminAuditAction =
@@ -7,7 +8,9 @@ export type AdminAuditAction =
 
 @Injectable()
 export class AdminAuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   async record(params: {
     adminId: string;
@@ -20,7 +23,7 @@ export class AdminAuditService {
         adminId: params.adminId,
         action: params.action,
         targetId: params.targetId,
-        details: params.details,
+        details: params.details as Prisma.InputJsonValue,
       },
     });
   }

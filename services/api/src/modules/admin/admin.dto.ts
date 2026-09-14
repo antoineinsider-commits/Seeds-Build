@@ -1,9 +1,15 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { VerificationStatus } from '@prisma/client';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class SetListingVerificationDto {
-  @IsIn([VerificationStatus.VERIFIED, VerificationStatus.REJECTED])
-  status!: VerificationStatus;
+  @IsIn(['VERIFIED', 'REJECTED'])
+  status!: 'VERIFIED' | 'REJECTED';
 }
 
 export class AdminAuditQueryDto {

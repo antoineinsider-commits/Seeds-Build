@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { VerificationStatus } from '@prisma/client';
-import { AdminAuditService } from './admin.audit.service';
 import { PrismaService } from '../../common/prisma.service';
+import { AdminAuditService } from './admin.audit.service';
+
+type ListingVerificationStatus = 'VERIFIED' | 'REJECTED';
 
 @Injectable()
 export class AdminService {
@@ -15,7 +16,9 @@ export class AdminService {
 
   async getPendingListings() {
     return this.prisma.listing.findMany({
-      where: { verificationStatus: VerificationStatus.PENDING },
+      where: {
+        verificationStatus: 'PENDING',
+      },
       include: {
         solver: {
           select: {
@@ -25,17 +28,21 @@ export class AdminService {
           },
         },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: {
+        createdAt: 'asc',
+      },
     });
   }
 
   async setListingVerification(
     adminId: string,
     listingId: string,
-    status: VerificationStatus.VERIFIED | VerificationStatus.REJECTED,
+    status: ListingVerificationStatus,
   ) {
     const listing = await this.prisma.listing.findUnique({
-      where: { id: listingId },
+      where: {
+        id: listingId,
+      },
     });
 
     if (!listing) {
@@ -43,15 +50,20 @@ export class AdminService {
     }
 
     const updated = await this.prisma.listing.update({
-      where: { id: listingId },
-      data: { verificationStatus: status },
+      where: {
+        id: listingId,
+      },
+      data: {
+        verificationStatus: status,
+      },
     });
 
     await this.auditService.record({
       adminId,
-      action: status === VerificationStatus.VERIFIED
-        ? 'LISTING_VERIFIED'
-        : 'LISTING_REJECTED',
+      action:
+        status === 'VERIFIED'
+          ? 'LISTING_VERIFIED'
+          : 'LISTING_REJECTED',
       targetId: listingId,
       details: {
         previousStatus: listing.verificationStatus,
@@ -68,7 +80,13 @@ export class AdminService {
     action?: string;
     adminId?: string;
   }) {
-    const { page, limit, action, adminId } = params;
+    const {
+      page,
+      limit,
+      action,
+      adminId,
+    } = params;
+
     const where = {
       ...(action ? { action } : {}),
       ...(adminId ? { adminId } : {}),
@@ -92,11 +110,16 @@ export class AdminService {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: {
+          createdAt: 'desc',
+        },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.adminAuditLog.count({ where }),
+
+      this.prisma.adminAuditLog.count({
+        where,
+      }),
     ]);
 
     return {
