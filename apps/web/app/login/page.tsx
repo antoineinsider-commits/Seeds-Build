@@ -3,7 +3,35 @@
 import React, { useState } from 'react';
 import { saveTokens } from '../../lib/auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+
+type LoginUser = {
+  id: string;
+  email: string;
+  role: 'SEEKER' | 'SOLVER' | 'ADMIN' | 'SUPER_ADMIN';
+};
+
+type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: LoginUser;
+};
+
+function getRedirectPath(role: LoginUser['role']) {
+  switch (role) {
+    case 'ADMIN':
+    case 'SUPER_ADMIN':
+      return '/admin/listings';
+
+    case 'SOLVER':
+      return '/listings';
+
+    case 'SEEKER':
+    default:
+      return '/problems/new';
+  }
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('seeker@restaurantgroup.com');
@@ -19,20 +47,48 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Login failed (${res.status})`);
+
+        throw new Error(
+          body.message || `Login failed (${res.status})`,
+        );
       }
 
-      const data = await res.json();
-      saveTokens(data.accessToken, data.refreshToken);
-      window.location.href = '/problems/new';
+      const data: LoginResponse = await res.json();
+
+      if (
+        !data.accessToken ||
+        !data.refreshToken ||
+        !data.user ||
+        !data.user.role
+      ) {
+        throw new Error('Login response is missing required account information');
+      }
+
+      saveTokens(
+        data.accessToken,
+        data.refreshToken,
+      );
+
+      const redirectPath = getRedirectPath(data.user.role);
+
+      window.location.href = redirectPath;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Login failed',
+      );
     } finally {
       setLoading(false);
     }
@@ -40,7 +96,9 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-sm mx-auto px-4 py-24">
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">Log in</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-6">
+        Log in
+      </h1>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3 mb-4">
@@ -48,9 +106,15 @@ export default function LoginPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4"
+      >
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Email
+          </label>
+
           <input
             type="email"
             required
@@ -59,8 +123,12 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Password
+          </label>
+
           <input
             type="password"
             required
@@ -69,6 +137,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
+
         <button
           type="submit"
           disabled={loading}
@@ -79,7 +148,7 @@ export default function LoginPage() {
       </form>
 
       <p className="text-xs text-slate-500 mt-4">
-        Pre-filled with the seeded demo seeker account for testing.
+        Demo account credentials are pre-filled for testing.
       </p>
     </div>
   );
