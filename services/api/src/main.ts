@@ -20,7 +20,14 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',
+      'https://literate-xylophone-5vvpwwj6w7j6hvg6w-3000.app.github.dev',
+    ],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
   // Required for correct rate limiting / client-IP detection behind a load
   // balancer or reverse proxy — without this, ThrottlerGuard sees the
   // proxy's IP for every request instead of the real client's, and every

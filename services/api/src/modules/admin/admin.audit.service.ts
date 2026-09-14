@@ -4,7 +4,10 @@ import { PrismaService } from '../../common/prisma.service';
 
 export type AdminAuditAction =
   | 'LISTING_VERIFIED'
-  | 'LISTING_REJECTED';
+  | 'LISTING_REJECTED'
+  | 'USER_ACTIVATED'
+  | 'USER_DEACTIVATED'
+  | 'USER_VERIFICATION_UPDATED';
 
 @Injectable()
 export class AdminAuditService {

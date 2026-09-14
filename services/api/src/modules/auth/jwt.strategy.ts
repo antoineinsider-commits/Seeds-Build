@@ -36,8 +36,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User no longer exists or session is invalid');
-    }
+  throw new UnauthorizedException(
+    'User no longer exists or session is invalid',
+  );
+}
+
+if (!user.isActive) {
+  throw new UnauthorizedException(
+    'Your account has been deactivated',
+  );
+}
 
     return {
       id: user.id,

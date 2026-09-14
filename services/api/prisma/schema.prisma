@@ -66,6 +66,7 @@ model User {
   passwordHash         String
   role                 Role               @default(SEEKER)
   isEmailVerified      Boolean            @default(false)
+  isActive             Boolean            @default(true)
   verificationToken    String?
   mfaEnabled           Boolean            @default(false)
   mfaSecret            String?

@@ -11,5 +11,8 @@ import { PrismaService } from '../../common/prisma.service';
     AdminService,
     AdminAuditService,
   ],
+  exports: [
+    AdminAuditService,
+  ],
 })
 export class AdminModule {}
