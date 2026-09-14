@@ -49,10 +49,30 @@ export default function CreateListingPage() {
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        const msg = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-        throw new Error(msg || `Creation failed (${res.status})`);
-      }
+  const body = await res.json().catch(() => ({}));
+
+  let msg = `Creation failed (${res.status})`;
+
+  if (Array.isArray(body.message)) {
+    msg = body.message.join(', ');
+  } else if (typeof body.message === 'string') {
+    msg = body.message;
+  } else if (body.message && typeof body.message === 'object') {
+    msg = Object.entries(body.message)
+      .map(([key, value]) => {
+        if (Array.isArray(value)) {
+          return `${key}: ${value.join(', ')}`;
+        }
+
+        return `${key}: ${String(value)}`;
+      })
+      .join(' | ');
+  } else if (typeof body.error === 'string') {
+    msg = body.error;
+  }
+
+  throw new Error(msg);
+}
 
       const created = await res.json();
       setCreatedId(created.id);
