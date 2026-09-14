@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
+import { AdminController } from './admin.controller';
+import { AdminService } from './admin.service';
+import { AdminAuditService } from './admin.audit.service';
+import { PrismaService } from '../../common/prisma.service';
 
-// STUB MODULE — scaffolded so AppModule resolves and the app boots.
-// Controllers, services, and DTOs for Admin still need to be implemented
-// per MASTER_AI_BUILD_PROMPT.md Section 8 (API surface) and Section 7 (data model).
-@Module({})
+@Module({
+  controllers: [AdminController],
+  providers: [PrismaService, AdminService, AdminAuditService],
+})
 export class AdminModule {}
