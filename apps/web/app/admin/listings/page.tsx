@@ -84,13 +84,31 @@ export default function AdminListingsPage() {
       );
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(() => ({}));
 
-        throw new Error(
-          body.message ||
-            `Failed to load pending listings (${response.status})`,
-        );
-      }
+  let message = `Failed to load pending listings (${response.status})`;
+
+  if (typeof body.message === 'string') {
+    message = body.message;
+  } else if (Array.isArray(body.message)) {
+    message = body.message
+      .map((item: unknown) =>
+        typeof item === 'string'
+          ? item
+          : JSON.stringify(item),
+      )
+      .join(', ');
+  } else if (
+    body.message &&
+    typeof body.message === 'object'
+  ) {
+    message = JSON.stringify(body.message);
+  } else if (typeof body.error === 'string') {
+    message = body.error;
+  }
+
+  throw new Error(message);
+}
 
       const data = await response.json();
 
@@ -140,13 +158,31 @@ export default function AdminListingsPage() {
       );
 
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(() => ({}));
 
-        throw new Error(
-          body.message ||
-            `Failed to update listing (${response.status})`,
-        );
-      }
+  let message = `Failed to update listing (${response.status})`;
+
+  if (typeof body.message === 'string') {
+    message = body.message;
+  } else if (Array.isArray(body.message)) {
+    message = body.message
+      .map((item: unknown) =>
+        typeof item === 'string'
+          ? item
+          : JSON.stringify(item),
+      )
+      .join(', ');
+  } else if (
+    body.message &&
+    typeof body.message === 'object'
+  ) {
+    message = JSON.stringify(body.message);
+  } else if (typeof body.error === 'string') {
+    message = body.error;
+  }
+
+  throw new Error(message);
+}
 
       setListings((current) =>
         current.filter((listing) => listing.id !== listingId),
