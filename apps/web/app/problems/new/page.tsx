@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getAccessToken, isLoggedIn } from '../../../lib/auth';
+import { isLoggedIn, authFetch } from '../../../lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -32,12 +32,9 @@ export default function PostProblemWizard() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/problems`, {
+      const res = await authFetch(`${API_URL}/problems`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 

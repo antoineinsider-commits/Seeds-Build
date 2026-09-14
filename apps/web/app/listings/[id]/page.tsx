@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { getAccessToken, isLoggedIn } from '../../../lib/auth';
+import { isLoggedIn, authFetch } from '../../../lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -59,9 +59,7 @@ export default function ListingDetailPage() {
   useEffect(() => {
     if (!isLoggedIn()) return;
     async function fetchMyProblems() {
-      const res = await fetch(`${API_URL}/problems/mine`, {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
+      const res = await authFetch(`${API_URL}/problems/mine`);
       if (res.ok) {
         const data = await res.json();
         setMyProblems(data);
@@ -86,12 +84,9 @@ export default function ListingDetailPage() {
 
     setSending(true);
     try {
-      const res = await fetch(`${API_URL}/requests`, {
+      const res = await authFetch(`${API_URL}/requests`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problemId: selectedProblemId,
           listingId,

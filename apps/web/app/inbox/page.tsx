@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getAccessToken, isLoggedIn } from '../../lib/auth';
+import { isLoggedIn, authFetch } from '../../lib/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -38,9 +38,7 @@ export default function InboxPage() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/requests/inbox`, {
-        headers: { Authorization: `Bearer ${getAccessToken()}` },
-      });
+      const res = await authFetch(`${API_URL}/requests/inbox`);
       if (!res.ok) {
         if (res.status === 403) {
           throw new Error('Only registered Solver accounts have an inbox.');
@@ -65,12 +63,9 @@ export default function InboxPage() {
   const handleStatusChange = async (id: string, nextStatus: string) => {
     setUpdatingId(id);
     try {
-      const res = await fetch(`${API_URL}/requests/${id}/status`, {
+      const res = await authFetch(`${API_URL}/requests/${id}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
       });
       if (!res.ok) {
