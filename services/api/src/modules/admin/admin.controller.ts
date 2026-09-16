@@ -28,6 +28,11 @@ export class AdminController {
     return this.adminService.getPendingListings();
   }
 
+  @Get('listings/:id')
+  listingDetails(@Param('id') id: string) {
+    return this.adminService.getListingForModeration(id);
+  }
+
   @Patch('listings/:id/verification')
   setListingVerification(
     @Req() req: any,

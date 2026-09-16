@@ -1,390 +1,107 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { authFetch } from '../../../lib/auth';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
-type PendingListing = {
+interface PendingListing {
   id: string;
   title: string;
-  description: string;
-  price: number | string;
-  verificationStatus: string;
+  category: string;
+  priceMin: number;
+  priceMax: number | null;
   createdAt: string;
-  solver?: {
-    companyName: string | null;
-    rating: number | null;
+  solver: {
+    companyName: string;
+    rating: number;
     verificationStatus: string;
   };
-};
-
-type AuthTokens = {
-  accessToken?: string;
-};
-
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const possibleKeys = [
-    'accessToken',
-    'access_token',
-    'seeds_access_token',
-    'tokens',
-  ];
-
-  for (const key of possibleKeys) {
-    const value = localStorage.getItem(key);
-
-    if (!value) continue;
-
-    try {
-      const parsed = JSON.parse(value) as AuthTokens;
-
-      if (parsed.accessToken) {
-        return parsed.accessToken;
-      }
-    } catch {
-      return value;
-    }
-  }
-
-  return null;
 }
 
-export default function AdminListingsPage() {
+export default function AdminPendingListingsPage() {
   const [listings, setListings] = useState<PendingListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
 
-  const loadPendingListings = async () => {
+  async function fetchPending() {
     setLoading(true);
     setError(null);
-    setMessage(null);
-
     try {
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error('You are not logged in.');
+      const res = await authFetch(`${API_URL}/admin/listings/pending`);
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          throw new Error('You need an Admin account to view this page.');
+        }
+        throw new Error(`Failed to load pending listings (${res.status})`);
       }
-
-      const response = await fetch(
-        `${API_URL}/admin/listings/pending`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: 'no-store',
-        },
-      );
-
-      if (!response.ok) {
-  const body = await response.json().catch(() => ({}));
-
-  let message = `Failed to load pending listings (${response.status})`;
-
-  if (typeof body.message === 'string') {
-    message = body.message;
-  } else if (Array.isArray(body.message)) {
-    message = body.message
-      .map((item: unknown) =>
-        typeof item === 'string'
-          ? item
-          : JSON.stringify(item),
-      )
-      .join(', ');
-  } else if (
-    body.message &&
-    typeof body.message === 'object'
-  ) {
-    message = JSON.stringify(body.message);
-  } else if (typeof body.error === 'string') {
-    message = body.error;
-  }
-
-  throw new Error(message);
-}
-
-      const data = await response.json();
-
-      setListings(Array.isArray(data) ? data : []);
+      setListings(await res.json());
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to load pending listings',
-      );
+      setError(err instanceof Error ? err.message : 'Failed to load pending listings');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadPendingListings();
-  }, []);
-
-  const updateVerification = async (
-    listingId: string,
-    status: 'VERIFIED' | 'REJECTED',
-  ) => {
-    setActionId(listingId);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const token = getAccessToken();
-
-      if (!token) {
-        throw new Error('You are not logged in.');
-      }
-
-      const response = await fetch(
-        `${API_URL}/admin/listings/${listingId}/verification`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            status,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-  const body = await response.json().catch(() => ({}));
-
-  let message = `Failed to update listing (${response.status})`;
-
-  if (typeof body.message === 'string') {
-    message = body.message;
-  } else if (Array.isArray(body.message)) {
-    message = body.message
-      .map((item: unknown) =>
-        typeof item === 'string'
-          ? item
-          : JSON.stringify(item),
-      )
-      .join(', ');
-  } else if (
-    body.message &&
-    typeof body.message === 'object'
-  ) {
-    message = JSON.stringify(body.message);
-  } else if (typeof body.error === 'string') {
-    message = body.error;
   }
 
-  throw new Error(message);
-}
+  useEffect(() => {
+    fetchPending();
+  }, []);
 
-      setListings((current) =>
-        current.filter((listing) => listing.id !== listingId),
-      );
+  if (loading) {
+    return <div className="max-w-4xl mx-auto px-4 py-12 text-slate-500">Loading...</div>;
+  }
 
-      setMessage(
-        status === 'VERIFIED'
-          ? 'Listing verified successfully.'
-          : 'Listing rejected successfully.',
-      );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to update listing',
-      );
-    } finally {
-      setActionId(null);
-    }
-  };
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-4">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
-            <p className="text-sm font-medium text-emerald-600 mb-1">
-              SEEDS ADMIN
-            </p>
-
-            <h1 className="text-3xl font-bold text-slate-900">
-              Listing Moderation
-            </h1>
-
-            <p className="text-slate-600 mt-2">
-              Review and approve solver listings before they appear
-              publicly.
-            </p>
-          </div>
-
-          <button
-            onClick={loadPendingListings}
-            disabled={loading}
-            className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium hover:bg-slate-100 disabled:opacity-50"
-          >
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
-            {error}
-          </div>
-        )}
-
-        {message && (
-          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
-            {message}
-          </div>
-        )}
-
-        {!loading && !error && (
-          <div className="mb-6">
-            <div className="inline-flex items-center rounded-full bg-white border border-slate-200 px-4 py-2">
-              <span className="font-semibold text-slate-900">
-                {listings.length}
-              </span>
-
-              <span className="ml-2 text-slate-600">
-                pending listing
-                {listings.length === 1 ? '' : 's'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
-            Loading pending listings...
-          </div>
-        ) : listings.length === 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
-            <div className="text-4xl mb-4">✓</div>
-
-            <h2 className="text-xl font-semibold text-slate-900">
-              No pending listings
-            </h2>
-
-            <p className="text-slate-500 mt-2">
-              All submitted listings have been reviewed.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-5">
-            {listings.map((listing) => {
-              const isProcessing = actionId === listing.id;
-
-              return (
-                <article
-                  key={listing.id}
-                  className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
-                >
-                  <div className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-                            PENDING
-                          </span>
-
-                          <span className="text-xs text-slate-400">
-                            ID: {listing.id}
-                          </span>
-                        </div>
-
-                        <h2 className="text-xl font-bold text-slate-900">
-                          {listing.title}
-                        </h2>
-
-                        <p className="text-slate-600 mt-3 whitespace-pre-wrap">
-                          {listing.description}
-                        </p>
-
-                        <div className="grid sm:grid-cols-3 gap-4 mt-6">
-                          <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wide">
-                              Price
-                            </p>
-
-                            <p className="font-semibold text-slate-900 mt-1">
-                              {String(listing.price)}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wide">
-                              Solver
-                            </p>
-
-                            <p className="font-semibold text-slate-900 mt-1">
-                              {listing.solver?.companyName ||
-                                'Unnamed solver'}
-                            </p>
-                          </div>
-
-                          <div>
-                            <p className="text-xs text-slate-400 uppercase tracking-wide">
-                              Solver verification
-                            </p>
-
-                            <p className="font-semibold text-slate-900 mt-1">
-                              {listing.solver?.verificationStatus ||
-                                'UNKNOWN'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-slate-400 mt-5">
-                          Submitted{' '}
-                          {new Date(
-                            listing.createdAt,
-                          ).toLocaleString()}
-                        </p>
-                      </div>
-
-                      <div className="flex lg:flex-col gap-3 lg:w-36">
-                        <button
-                          disabled={isProcessing}
-                          onClick={() =>
-                            updateVerification(
-                              listing.id,
-                              'VERIFIED',
-                            )
-                          }
-                          className="flex-1 lg:w-full px-4 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          {isProcessing
-                            ? 'Processing...'
-                            : 'Verify'}
-                        </button>
-
-                        <button
-                          disabled={isProcessing}
-                          onClick={() =>
-                            updateVerification(
-                              listing.id,
-                              'REJECTED',
-                            )
-                          }
-                          className="flex-1 lg:w-full px-4 py-2.5 rounded-lg border border-red-300 text-red-700 font-semibold hover:bg-red-50 disabled:opacity-50"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+    <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Pending Listings</h1>
+        <span className="text-sm text-slate-500">{listings.length} awaiting review</span>
       </div>
-    </main>
+
+      {listings.length === 0 ? (
+        <p className="text-slate-500">No listings are currently pending review.</p>
+      ) : (
+        <div className="space-y-3">
+          {listings.map((listing) => (
+            <div
+              key={listing.id}
+              className="border border-slate-200 rounded-xl p-5 flex justify-between items-center"
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                    PENDING
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Submitted {new Date(listing.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <h2 className="font-semibold text-slate-900">{listing.title}</h2>
+                <p className="text-sm text-slate-500">
+                  {listing.category} &middot; By {listing.solver.companyName} &middot; ${listing.priceMin}
+                  {listing.priceMax ? `–$${listing.priceMax}` : '+'}
+                </p>
+              </div>
+              <button
+                onClick={() => (window.location.href = `/admin/listings/${listing.id}`)}
+                className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800"
+              >
+                Review
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
