@@ -64,9 +64,23 @@ export default function AdminPendingListingsPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Pending Listings</h1>
-        <span className="text-sm text-slate-500">{listings.length} awaiting review</span>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">
+          Pending Listings
+        </h1>
+
+        <span className="text-sm text-slate-500">
+          {listings.length} awaiting review
+        </span>
       </div>
+
+      <button
+        onClick={() => (window.location.href = '/admin/audit-logs')}
+        className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-slate-800"
+      >
+        Audit Logs
+      </button>
+    </div>
 
       {listings.length === 0 ? (
         <p className="text-slate-500">No listings are currently pending review.</p>
