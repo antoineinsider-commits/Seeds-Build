@@ -143,9 +143,11 @@ model SolverProfile {
   skills             String[]
   industries         String[]
   verificationStatus VerificationStatus @default(UNVERIFIED)
-  verificationDocUrl String? // Column-level encrypted or restricted bucket
+  verificationDocUrl String?
   rating             Float              @default(0.0)
   reviewCount        Int                @default(0)
+  reputationScore    Float              @default(0.0)
+  completedJobs      Int                @default(0)
   responseTimeHours  Int                @default(24)
   listings           Listing[]
   proposals          Proposal[]
@@ -155,6 +157,8 @@ model SolverProfile {
   updatedAt          DateTime           @updatedAt
 
   @@index([verificationStatus])
+  @@index([rating])
+  @@index([reputationScore])
 }
 
 model Problem {
@@ -271,8 +275,13 @@ model Review {
   comment               String   @db.Text
   isVerified            Boolean  @default(true)
   createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
+  @@unique([requestId, reviewerId])
   @@index([reviewedPartyId])
+  @@index([reviewerId])
+  @@index([requestId])
+  @@index([createdAt])
 }
 
 model Subscription {
