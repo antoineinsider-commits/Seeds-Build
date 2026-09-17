@@ -145,6 +145,102 @@ export class AdminService {
   /**
    * Get admin audit logs.
    */
+
+  async getDashboard() {
+  const [
+    totalUsers,
+    activeUsers,
+    seekers,
+    solvers,
+    pendingListings,
+    verifiedListings,
+    openReports,
+    recentActivity,
+  ] = await this.prisma.$transaction([
+    this.prisma.user.count(),
+
+    this.prisma.user.count({
+      where: {
+        isActive: true,
+      },
+    }),
+
+    this.prisma.user.count({
+      where: {
+        role: 'SEEKER',
+      },
+    }),
+
+    this.prisma.user.count({
+      where: {
+        role: 'SOLVER',
+      },
+    }),
+
+    this.prisma.listing.count({
+      where: {
+        verificationStatus: 'PENDING',
+      },
+    }),
+
+    this.prisma.listing.count({
+      where: {
+        verificationStatus: 'VERIFIED',
+      },
+    }),
+
+    this.prisma.report.count({
+      where: {
+        status: {
+          in: ['OPEN', 'REVIEWING'],
+        },
+      },
+    }),
+
+    this.prisma.adminAuditLog.findMany({
+      take: 10,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        action: true,
+        targetId: true,
+        details: true,
+        createdAt: true,
+        admin: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  return {
+    users: {
+      total: totalUsers,
+      active: activeUsers,
+      inactive:
+        totalUsers - activeUsers,
+      seekers,
+      solvers,
+    },
+
+    listings: {
+      pending: pendingListings,
+      verified: verifiedListings,
+    },
+
+    reports: {
+      open: openReports,
+    },
+
+    recentActivity,
+  };
+}
+
   async getAuditLogs(params: {
     page: number;
     limit: number;

@@ -166,9 +166,10 @@ export class UsersService {
     }
 
     await this.assertCanManageUser(
-      adminId,
-      target.role,
-    );
+    adminId,
+    userId,
+    target.role,
+  );
 
     const updated = await this.prisma.user.update({
       where: {
@@ -228,9 +229,10 @@ export class UsersService {
     }
 
     await this.assertCanManageUser(
-      adminId,
-      target.role,
-    );
+    adminId,
+    userId,
+    target.role,
+  );
 
     if (!target.solverProfile) {
       throw new ForbiddenException(
@@ -275,19 +277,20 @@ export class UsersService {
     return updated;
   }
 
-  private async assertCanManageUser(
+    private async assertCanManageUser(
     adminId: string,
+    targetUserId: string,
     targetRole: UserRole,
   ) {
-    const admin = await this.prisma.user.findUnique({
-      where: {
-        id: adminId,
-      },
-
-      select: {
-        role: true,
-      },
-    });
+    const admin =
+      await this.prisma.user.findUnique({
+        where: {
+          id: adminId,
+        },
+        select: {
+          role: true,
+        },
+      });
 
     if (!admin) {
       throw new ForbiddenException(
@@ -295,9 +298,23 @@ export class UsersService {
       );
     }
 
+    if (adminId === targetUserId) {
+      throw new ForbiddenException(
+        'Administrators cannot modify their own administrative account through this endpoint',
+      );
+    }
+
     if (
-      (targetRole === 'ADMIN' ||
-        targetRole === 'SUPER_ADMIN') &&
+      targetRole === 'SUPER_ADMIN' &&
+      admin.role !== 'SUPER_ADMIN'
+    ) {
+      throw new ForbiddenException(
+        'Only a SUPER_ADMIN can manage SUPER_ADMIN accounts',
+      );
+    }
+
+    if (
+      targetRole === 'ADMIN' &&
       admin.role !== 'SUPER_ADMIN'
     ) {
       throw new ForbiddenException(

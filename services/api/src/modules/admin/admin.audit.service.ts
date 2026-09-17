@@ -7,7 +7,10 @@ export type AdminAuditAction =
   | 'LISTING_REJECTED'
   | 'USER_ACTIVATED'
   | 'USER_DEACTIVATED'
-  | 'USER_VERIFICATION_UPDATED';
+  | 'USER_VERIFICATION_UPDATED'
+  | 'REPORT_RESOLVED'
+  | 'REPORT_DISMISSED'
+  | 'ADMIN_SECURITY_ACTION_BLOCKED';
 
 @Injectable()
 export class AdminAuditService {

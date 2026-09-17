@@ -46,6 +46,11 @@ export class AdminController {
     );
   }
 
+  @Get('dashboard')
+  dashboard() {
+    return this.adminService.getDashboard();
+  }
+  
   @Get('audit-logs')
   auditLogs(@Query() query: AdminAuditQueryDto) {
     return this.adminService.getAuditLogs({

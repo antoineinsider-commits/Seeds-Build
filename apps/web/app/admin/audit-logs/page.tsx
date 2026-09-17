@@ -134,7 +134,7 @@ export default function AdminAuditLogsPage() {
         return 'User Deactivated';
 
       case 'USER_VERIFICATION_UPDATED':
-        return 'User Verification Updated';
+        return 'User Verification Updated';  
 
       default:
         return value;
@@ -206,6 +206,12 @@ export default function AdminAuditLogsPage() {
           </option>
           <option value="USER_VERIFICATION_UPDATED">
             User Verification Updated
+          </option>
+          <option value="REPORT_RESOLVED">
+            Report Resolved
+          </option>
+          <option value="REPORT_DISMISSED">
+            Report Dismissed
           </option>
         </select>
       </div>

@@ -10,6 +10,7 @@ import { MatchingModule } from './modules/matching/matching.module';
 import { RequestsLeadsModule } from './modules/requests-leads/requests-leads.module';
 import { ProposalsModule } from './modules/proposals/proposals.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
@@ -33,6 +34,7 @@ import { PrismaService } from './common/prisma.service';
     ReviewsModule,
     BillingModule,
     AdminModule,
+    ReportsModule,
   ],
   providers: [
     PrismaService,
